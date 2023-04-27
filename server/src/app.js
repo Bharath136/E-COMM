@@ -10,6 +10,7 @@ const { MONGO_URI } = require('./db/connect');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const models = require("./models/schema");
+
 // app.use(bodyParser.json());
 app.use(cors());
 
@@ -33,8 +34,8 @@ const adminAuthenticateToken = async (req, res, next) => {
     }
 };
 
-// user middleware
 
+// user middleware
 const userAuthenticateToken = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -58,66 +59,93 @@ const userAuthenticateToken = async (req, res, next) => {
 
 
 // Add a new category to the database
-app.post('/api/admin/add-category', adminAuthenticateToken, async (req, res) => {
-    try {
-        const { name, description } = req.body;
-        if (!name) {
-            res.status(400).send('Category name is required');
-            return;
-        }
-        const newCategory = new models.Category({ name });
-        await newCategory.save();
-        res.status(200).send('Category added successfully');
-    } catch (error) {
-        console.error(error);
-        res.status(500).send('Server error');
+
+app.post('/api/admin/add-category', async (req, res) => {
+  try {
+    const { category } = req.body;
+
+    if (!category) {
+      return res.status(400).json({ error: 'Category name is required' });
     }
+
+    const existingCategory = await models.Category.findOne({ category });
+
+    if (existingCategory) {
+      return res.status(400).json({ error: 'Category already exists' });
+    }
+
+    const newCategory = new models.Category({ category });
+    await newCategory.save();
+
+    res.status(200).json({ message: 'Category added successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
+
+// app.delete('/api/admin/delete-all-categories', async (req, res) => {
+//     try {
+//       await models.Category.deleteMany({});
+//       res.status(200).json({ message: 'All categories deleted successfully' });
+//     } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ error: 'Server error' });
+//     }
+//   });
+ 
+
+  app.get('/api/admin/categories', async (req,res) => {
+    try {
+        const cotegoriesList = await models.Category.find();
+        res.status(200).send(cotegoriesList);
+    } catch (error) {
+        res.status(500).send('Server error');
+        console.log(error);
+    }
+  })
+  
 
 
 // Add a new product to the database and associate it with an existing category
 app.post('/api/admin/add-product', async (req, res) => {
     try {
-        // Validate request body
-        const { name, description, price, brand, image, category, countInStock, rating } = req.body;
-        if (!name || !description || !price || !brand || !image || !category || !countInStock || !rating) {
-            return res.status(400).send({ message: 'Missing required fields' });
-        }
-
-        // Check if category exists
-        const foundCategory = await models.Category.findOne({ name: category });
-        console.log(foundCategory)
-        if (!foundCategory) {
-            return res.status(404).send({ message: 'Category not found' });
-        }
-
-        // Create a new product document and associate it with the category
-        const product = new models.Product({
-            name,
-            description,
-            price,
-            brand,
-            image,
-            category: foundCategory._id, // associate the product with the found category
-            countInStock,
-            rating,
-            dateCreated: new Date()
-        });
-
-        // Save the product document
-        await product.save();
-
-        // Send response with the created product document
-        res.status(201).send(product);
+      const { name, description, price, brand, image, category, countInStock, rating } = req.body;
+      console.log(category);
+      if (!name || !description || !price || !brand || !image || !category || !countInStock || !rating) {
+        return res.status(400).send({ message: 'Missing required fields' });
+      }
+  
+      const foundCategory = await models.Category.findOne({ category });
+      console.log(foundCategory);
+      if (!foundCategory) {
+        return res.status(404).send({ message: 'Category not found' });
+      }
+      
+      const product = new models.Product({
+        name,
+        description,
+        price,
+        brand,
+        image,
+        category: foundCategory, 
+        countInStock,
+        rating,
+        dateCreated: new Date()
+      });
+  
+      await product.save();
+  
+      res.status(201).send(product);
     } catch (error) {
-        console.log(error);
-        res.status(500).send({ message: 'Internal server error' });
+      console.log(error);
+      res.status(500).send({ message: 'Internal server error' });
     }
-});
+  });
+  
 
 
 // manage order schema
-
 // Manage order (admin only)
 app.put('/api/admin/order/:id', adminAuthenticateToken, async (req, res) => {
     try {
@@ -203,7 +231,6 @@ app.get('/api/admin/feedback', adminAuthenticateToken, async (req, res) => {
 
 
 // admin register schema
-
 app.post('/api/admin/register', async (request, response) => {
     try {
         const { username, password } = request.body;
@@ -258,19 +285,21 @@ app.post('/api/admin/login', async (request, response) => {
 
 
 // user schema
-
 app.post('/api/user/register', async (req, res) => {
     try {
         const { firstname, lastname, username, email, password } = req.body;
-        const user = await models.Users.findOne({ email });
 
+        // Check if email already exists
+        const user = await models.Users.findOne({ email });
         if (user) {
             return res.status(400).send('User already exists');
         }
 
+        // Hash the password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
+        // Create a new user object
         const newUser = new models.Users({
             firstname,
             lastname,
@@ -279,14 +308,16 @@ app.post('/api/user/register', async (req, res) => {
             password: hashedPassword,
         });
 
+        // Save the new user to the database
         const userCreated = await newUser.save();
         console.log(userCreated, 'user created');
         res.status(200).send('Successfully Registered');
     } catch (error) {
-        res.status(500).send('Server Error');
         console.log(error);
+        res.status(500).send('Server Error');
     }
 });
+
 
 
 
@@ -316,10 +347,6 @@ app.post('/api/user/login', async (request, response) => {
         console.log(error);
     }
 });
-
-
-
-
 
 
 // get users
@@ -352,6 +379,17 @@ app.delete('/api/user', async (req, res) => {
 });
 
 
+app.delete('/delete/api/users', async (req, res) => {
+    try {
+      await models.Product.deleteMany();
+      res.status(200).json({ message: 'All users deleted successfully' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Server Error' });
+    }
+  });
+
+
 // Get Products
 
 // Define a function to query the database for all products
@@ -371,6 +409,20 @@ app.get('/api/products', async (req, res) => {
     res.json(products);
 });
 
+
+// Get a single product
+app.get('/api/products/:id', async (req, res) => {
+    try {
+      const product = await models.Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error(`Error getting product with id ${req.params.id}`, error);
+      res.status(500).json({ message: `Error getting product with id ${req.params.id}` });
+    }
+  });
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
