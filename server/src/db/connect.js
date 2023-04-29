@@ -5,8 +5,6 @@ const db = 'mongodb+srv://ecommerceapp:ecommerceapp@cluster0.uu09u33.mongodb.net
 mongoose.connect(db, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  // useCreateIndex: true,
-  // useFindAndModify:false
 }).then(() => {
   console.log(`Connection successful`);
 }).catch((e) => {

@@ -13,12 +13,14 @@ const adminSchema = new mongoose.Schema({
     password: { type: String, required: true }
 });
 
+// category schema
 const categorySchema = new mongoose.Schema({
-    category: { type: String, required: true, unique: true }
-});
+    category: {type: String,required: true,unique: true,},
+    description: { type: String, }
+  });
 
 const productSchema = new mongoose.Schema({
-    name: { type: String, required: true },
+    productname: { type: String, required: true },
     description: { type: String, required: true },
     price: { type: Number, required: true },
     brand: { type: String, required: true },
@@ -26,18 +28,18 @@ const productSchema = new mongoose.Schema({
     category: { type: String, ref: 'Category', required: true },
     countInStock: { type: Number, required: true, min: 0, max: 255 },
     rating: { type: Number, required: true },
+    quantity: {type: Number, default: 1},
     dateCreated: { type: Date, default: Date.now }
 });
 
 
+
 const addToCartSchema = new mongoose.Schema({
-    productId: { type: 'string', required: true },
-    quantity: { type: 'number', minimum: 1, required: true },
-    color: { type: 'string' },
-    size: { type: 'string' }
+    productId: { type: String, required: true },
+    quantity: { type: Number, minimum: 1, required: true, default: 1 },
 });
 
-const orderSchema = new mongoose.Schema({
+const orderSchema = new mongoose.Schema({ 
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     products: [{
         product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },

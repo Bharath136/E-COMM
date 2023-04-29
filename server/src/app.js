@@ -60,42 +60,55 @@ const userAuthenticateToken = async (req, res, next) => {
 
 // Add a new category to the database
 
+// API endpoint to add a category
 app.post('/api/admin/add-category', async (req, res) => {
-  try {
-    const { category } = req.body;
+    try {
+        const { category, description } = req.body;
 
-    if (!category) {
-      return res.status(400).json({ error: 'Category name is required' });
+        // Validate inputs
+        if (!category) {
+            return res.status(400).send('Category and description are required');
+        }
+
+        // Check if category already exists
+        const existingCategory = await models.Category.findOne({ category });
+        if (existingCategory) {
+            return res.status(400).send('Category already exists');
+        }
+
+        // Create a new category object
+        const newCategory = new models.Category({
+            category,
+            description
+        });
+
+        // Save the new category to the database
+        const savedCategory = await newCategory.save();
+        console.log(savedCategory, 'category created');
+        
+        // Return success response
+        return res.status(200).send(savedCategory);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Server Error');
     }
-
-    const existingCategory = await models.Category.findOne({ category });
-
-    if (existingCategory) {
-      return res.status(400).json({ error: 'Category already exists' });
-    }
-
-    const newCategory = new models.Category({ category });
-    await newCategory.save();
-
-    res.status(200).json({ message: 'Category added successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
-  }
 });
 
-// app.delete('/api/admin/delete-all-categories', async (req, res) => {
-//     try {
-//       await models.Category.deleteMany({});
-//       res.status(200).json({ message: 'All categories deleted successfully' });
-//     } catch (error) {
-//       console.error(error);
-//       res.status(500).json({ error: 'Server error' });
-//     }
-//   });
- 
+  
+  
 
-  app.get('/api/admin/categories', async (req,res) => {
+app.delete('/api/admin/delete-all-categories', async (req, res) => {
+    try {
+      await models.Category.deleteMany({});
+      res.status(200).json({ message: 'All categories deleted successfully' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+
+app.get('/api/admin/categories', async (req, res) => {
     try {
         const cotegoriesList = await models.Category.find();
         res.status(200).send(cotegoriesList);
@@ -103,54 +116,112 @@ app.post('/api/admin/add-category', async (req, res) => {
         res.status(500).send('Server error');
         console.log(error);
     }
-  })
-  
+})
+
 
 
 // Add a new product to the database and associate it with an existing category
 app.post('/api/admin/add-product', async (req, res) => {
     try {
-      const { name, description, price, brand, image, category, countInStock, rating } = req.body;
-      console.log(category);
-      if (!name || !description || !price || !brand || !image || !category || !countInStock || !rating) {
-        return res.status(400).send({ message: 'Missing required fields' });
-      }
-  
-      const foundCategory = await models.Category.findOne({ category });
-      console.log(foundCategory);
-      if (!foundCategory) {
-        return res.status(404).send({ message: 'Category not found' });
-      }
-      
-      const product = new models.Product({
-        name,
-        description,
-        price,
-        brand,
-        image,
-        category: foundCategory, 
-        countInStock,
-        rating,
-        dateCreated: new Date()
-      });
-  
-      await product.save();
-  
-      res.status(201).send(product);
+        const { productname, description, price, brand, image, category, countInStock, rating, quantity } = req.body;
+        console.log(req.body);
+        if (!productname || !description || !price || !brand || !image || !category || !countInStock || !rating ) {
+            return res.status(400).send({ message: 'Missing required fields' });
+        }
+        const foundCategory = await models.Category.findOne({ category });
+        if (!foundCategory) {
+            return res.status(404).send({ message: 'Category not found' });
+        }
+        const product = new models.Product({
+            productname,
+            description,
+            price,
+            brand,
+            image,
+            category,
+            countInStock,
+            rating,
+            quantity,
+            dateCreated: new Date()
+        });
+
+        await product.save();
+
+        res.status(201).send(product);
     } catch (error) {
-      console.log(error);
-      res.status(500).send({ message: 'Internal server error' });
+        console.log(error);
+        res.status(500).send({ message: 'Internal server error' });
+    }
+});
+
+
+// Endpoint for adding an item to the cart
+app.post('/api/add-to-cart', async (req, res) => {
+    const { productId, quantity } = req.body;
+
+    // Validate the input data against the schema
+    const item = new models.AddToCart({ productId, quantity });
+    const validationError = item.validateSync();
+
+    if (validationError) {
+        return res.status(400).send(validationError.message);
+    }
+
+    try {
+        // Save the new cart item to the database
+        await item.save();
+        res.send(`Added ${quantity} of product ${productId} to cart`);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Internal server error');
+    }
+});
+
+app.delete('/api/delete-from-cart/:id', async (req, res) => {
+    try {
+        const deletedItem = await models.AddToCart.findByIdAndDelete(req.params.id);
+        if (!deletedItem) {
+            return res.status(404).send('Item not found');
+        }
+        res.send(`Deleted item ${itemId} from cart`);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Internal server error');
+    }
+});
+
+app.delete('/api/delete-cart-items', async (req, res) => {
+    try {
+      await models.AddToCart.deleteMany({});
+      res.send('All cart items deleted');
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Internal server error');
     }
   });
   
 
 
-// manage order schema
+app.get('/api/cart-items', async (req, res) => {
+    try {
+        const cartItems = await models.AddToCart.find();
+        const productIds = cartItems.map(item => item.productId);
+        const products = await models.Product.find({ _id: { $in: productIds } });
+        res.send(products);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Internal server error');
+    }
+});
+
+
+
+
 // Manage order (admin only)
 app.put('/api/admin/order/:id', adminAuthenticateToken, async (req, res) => {
     try {
         const orderId = req.params.id;
-        const order = await models.Product.findById(orderId);
+        const order = await models.Order.findById(orderId);
         if (!order) {
             return res.status(404).send('Order not found');
         }
@@ -321,6 +392,8 @@ app.post('/api/user/register', async (req, res) => {
 
 
 
+
+
 // user login schema
 
 app.post('/api/user/login', async (request, response) => {
@@ -381,13 +454,13 @@ app.delete('/api/user', async (req, res) => {
 
 app.delete('/delete/api/users', async (req, res) => {
     try {
-      await models.Product.deleteMany();
-      res.status(200).json({ message: 'All users deleted successfully' });
+        await models.Category.deleteMany();
+        res.status(200).json({ message: 'All users deleted successfully' });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Server Error' });
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
     }
-  });
+});
 
 
 // Get Products
@@ -413,17 +486,48 @@ app.get('/api/products', async (req, res) => {
 // Get a single product
 app.get('/api/products/:id', async (req, res) => {
     try {
-      const product = await models.Product.findById(req.params.id);
-      if (!product) {
+        const product = await models.Product.findById(req.params.id);
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        res.json(product);
+    } catch (error) {
+        console.error(`Error getting product with id ${req.params.id}`, error);
+        res.status(500).json({ message: `Error getting product with id ${req.params.id}` });
+    }
+});
+
+app.delete('/api/products/:id', async (req, res) => {
+    try {
+        const deletedProduct = await models.Product.findByIdAndDelete(req.params.id);
+        if (!deletedProduct) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        res.status(200).json({ message: 'Product deleted' });
+    } catch (error) {
+        console.error(`Error deleting product with id ${req.params.id}`, error);
+        res.status(500).json({ message: `Error deleting product with id ${req.params.id}` });
+    }
+});
+
+app.put('/api/products/:id', async (req, res) => {
+    try {
+      const updatedProduct = await models.Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+      if (!updatedProduct) {
         return res.status(404).json({ message: 'Product not found' });
       }
-      res.json(product);
+      res.status(200).json(updatedProduct);
     } catch (error) {
-      console.error(`Error getting product with id ${req.params.id}`, error);
-      res.status(500).json({ message: `Error getting product with id ${req.params.id}` });
+      console.error(`Error updating product with id ${req.params.id}`, error);
+      res.status(500).json({ message: `Error updating product with id ${req.params.id}` });
     }
   });
+  
+
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
+
+
+module.exports = app;
