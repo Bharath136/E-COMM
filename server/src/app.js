@@ -15,24 +15,18 @@ const models = require("./models/schema");
 app.use(cors());
 
 // admin middelware
-const adminAuthenticateToken = async (req, res, next) => {
-    try {
-        const authHeader = req.headers['authorization'];
-        const token = authHeader.split(" ")[1]
-        if (!token) {
-            res.status(401);
-            return res.send('Invalid JWT Token');
-        }
-        const decoded = jwt.verify(token, 'ADMIN_SECRET_TOKEN')
-        req.user = decoded.user;
-        next();
-
-    } catch (err) {
-        console.error(err);
-        res.status(500);
-        res.send('Server Error');
-    }
-};
+function adminAuthenticateToken(req, res, next) {
+    console.log("Hello")
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).send('Unauthorized');
+    jwt.verify(token, 'ADMIN_SECRET_TOKEN', (err, user) => {
+      if (err) return res.status(403).send('Forbidden');
+      req.user = user;
+      next();
+    });
+  }
+  
 
 
 // user middleware
@@ -59,11 +53,11 @@ const userAuthenticateToken = async (req, res, next) => {
 
 
 // Add a new category to the database
-
 // API endpoint to add a category
-app.post('/api/admin/add-category', async (req, res) => {
+app.post('/api/admin/add-category', adminAuthenticateToken, async (req, res) => {
     try {
         const { category, description } = req.body;
+        console.log(category)
 
         // Validate inputs
         if (!category) {
@@ -121,7 +115,7 @@ app.get('/api/admin/categories', async (req, res) => {
 
 
 // Add a new product to the database and associate it with an existing category
-app.post('/api/admin/add-product', async (req, res) => {
+app.post('/api/admin/add-product', adminAuthenticateToken, async (req, res) => {
     try {
         const { productname, description, price, brand, image, category, countInStock, rating, quantity } = req.body;
         console.log(req.body);
@@ -156,7 +150,7 @@ app.post('/api/admin/add-product', async (req, res) => {
 
 
 // Endpoint for adding an item to the cart
-app.post('/api/add-to-cart', async (req, res) => {
+app.post('/api/add-to-cart', userAuthenticateToken, async (req, res) => {
     const { productId, quantity } = req.body;
 
     // Validate the input data against the schema
@@ -213,6 +207,25 @@ app.get('/api/cart-items', async (req, res) => {
         res.status(500).send('Internal server error');
     }
 });
+
+
+// Create a new order
+app.post('/api/admin/order', async (req, res) => {
+    const order = new models.Order({
+      user: req.body.user,
+      phone:req.body.phone,
+      products: req.body.products,
+      address1: req.body.address1,
+      address2: req.body.address2
+    });
+  
+    try {
+      const newOrder = await order.save();
+      res.status(201).json(newOrder);
+    } catch (err) {
+      res.status(400).json({ message: err.message });
+    }
+  });
 
 
 
@@ -424,7 +437,7 @@ app.post('/api/user/login', async (request, response) => {
 
 // get users
 
-app.get('/api/users', async (req, res) => {
+app.get('/api/users',adminAuthenticateToken, async (req, res) => {
     try {
         const users = await models.Users.find();
         res.send(users);
@@ -435,11 +448,10 @@ app.get('/api/users', async (req, res) => {
 });
 
 
-app.delete('/api/user', async (req, res) => {
-    const { username } = req.body;
-
+app.delete('/api/user/:id', async (req, res) => {
+    const { id } = req.params;
     try {
-        const deletedUser = await models.Users.findOneAndDelete({ username });
+        const deletedUser = await models.Users.findById({ id });
         if (deletedUser) {
             res.send(`User ${username} deleted`);
         } else {
@@ -452,15 +464,15 @@ app.delete('/api/user', async (req, res) => {
 });
 
 
-app.delete('/delete/api/users', async (req, res) => {
-    try {
-        await models.Category.deleteMany();
-        res.status(200).json({ message: 'All users deleted successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
-});
+// app.delete('/delete/api/users',adminAuthenticateToken, async (req, res) => {
+//     try {
+//         await models.Category.deleteMany();
+//         res.status(200).json({ message: 'All users deleted successfully' });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Server Error' });
+//     }
+// });
 
 
 // Get Products
@@ -497,7 +509,7 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/products/:id', async (req, res) => {
+app.delete('/api/products/:id',adminAuthenticateToken, async (req, res) => {
     try {
         const deletedProduct = await models.Product.findByIdAndDelete(req.params.id);
         if (!deletedProduct) {
@@ -510,7 +522,7 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
-app.put('/api/products/:id', async (req, res) => {
+app.put('/api/products/:id', adminAuthenticateToken, async (req, res) => {
     try {
       const updatedProduct = await models.Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
       if (!updatedProduct) {
