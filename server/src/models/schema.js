@@ -40,18 +40,19 @@ const addToCartSchema = new mongoose.Schema({
 });
 
 const orderSchema = new mongoose.Schema({ 
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: String , ref: 'User', required: true },
     phone: {type: String, required:true},
-    products: [{
-        product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-        quantity: { type: Number, required: true }
-    }],
+    // products: [{
+    //     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    //     quantity: { type: Number, required: true }
+    // }],
+    productId: {type:String, required:true},
     status: { type: String, enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered'], default: 'Pending' },
     createdAt: { type: Date, default: Date.now },
     address1: { type: String, require: true },
     address2: { type: String, require: true }
 });
-
+ 
 
 const paymentSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

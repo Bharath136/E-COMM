@@ -102,7 +102,7 @@ app.delete('/api/admin/delete-all-categories', async (req, res) => {
   });
 
 
-app.get('/api/admin/categories', async (req, res) => {
+app.get('/api/categories', async (req, res) => {
     try {
         const cotegoriesList = await models.Category.find();
         res.status(200).send(cotegoriesList);
@@ -214,7 +214,7 @@ app.post('/api/admin/order', async (req, res) => {
     const order = new models.Order({
       user: req.body.user,
       phone:req.body.phone,
-      products: req.body.products,
+      productId: req.body.productId,
       address1: req.body.address1,
       address2: req.body.address2
     });
@@ -228,6 +228,18 @@ app.post('/api/admin/order', async (req, res) => {
   });
 
 
+  app.get('/api/admin/orders', async (req, res) => {
+    try {
+      const order = await models.Order.find();
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+      res.json(order);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+  
 
 
 // Manage order (admin only)
@@ -437,7 +449,7 @@ app.post('/api/user/login', async (request, response) => {
 
 // get users
 
-app.get('/api/users',adminAuthenticateToken, async (req, res) => {
+app.get('/api/users', async (req, res) => {
     try {
         const users = await models.Users.find();
         res.send(users);
